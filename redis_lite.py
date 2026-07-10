@@ -102,3 +102,71 @@ class RedisLite:
         
         # Referans sızıntısını önlemek için bir kopya dönüyoruz
         return self.db[key].copy()
+
+    # --- Sorted Set Metodları ---
+
+    def zadd(self, key: str, score, member: str) -> int:
+        """Sorted Set'e bir eleman ve skorunu ekler. Yeni eleman eklendiyse 1, skoru güncellendiyse 0 döner."""
+        if not isinstance(key, str) or not isinstance(member, str):
+            raise TypeError("Anahtar (key) ve üye (member) string olmalıdır.")
+        if not isinstance(score, (int, float)):
+            raise TypeError("Skor (score) bir sayı (int veya float) olmalıdır.")
+        
+        score = float(score)
+        
+        if key not in self.db:
+            self.db[key] = {}
+        elif not isinstance(self.db[key], dict):
+            raise TypeError("HATA: Belirtilen anahtar (key) uygun tipte değil.")
+        
+        is_new = 1 if member not in self.db[key] else 0
+        self.db[key][member] = score
+        return is_new
+
+    def zscore(self, key: str, member: str):
+        """Sorted Set içindeki üyenin skorunu döndürür."""
+        if not isinstance(key, str) or not isinstance(member, str):
+            raise TypeError("Anahtar (key) ve üye (member) string olmalıdır.")
+        
+        if key not in self.db:
+            return None
+        if not isinstance(self.db[key], dict):
+            raise TypeError("HATA: Belirtilen anahtar (key) uygun tipte değil.")
+        
+        return self.db[key].get(member)
+
+    def zrem(self, key: str, member: str) -> int:
+        """Sorted Set içinden bir üyeyi siler. Silindiyse 1, yoksa 0 döner."""
+        if not isinstance(key, str) or not isinstance(member, str):
+            raise TypeError("Anahtar (key) ve üye (member) string olmalıdır.")
+        
+        if key not in self.db:
+            return 0
+        if not isinstance(self.db[key], dict):
+            raise TypeError("HATA: Belirtilen anahtar (key) uygun tipte değil.")
+        
+        if member in self.db[key]:
+            del self.db[key][member]
+            return 1
+        return 0
+
+    def zrange(self, key: str, start: int, stop: int) -> list:
+        """Skorlara göre artan sırada üyeleri döndürür (start ve stop indekslerine göre)."""
+        if not isinstance(key, str):
+            raise TypeError("Anahtar (key) bir string olmalıdır.")
+        if not isinstance(start, int) or not isinstance(stop, int):
+            raise TypeError("Start ve stop indeksleri integer olmalıdır.")
+            
+        if key not in self.db:
+            return []
+        if not isinstance(self.db[key], dict):
+            raise TypeError("HATA: Belirtilen anahtar (key) uygun tipte değil.")
+        
+        # (member, score) çiftlerini önce skora, skoru aynıysa alfabetik olarak member'a göre sıralarız
+        sorted_items = sorted(self.db[key].items(), key=lambda item: (item[1], item[0]))
+        
+        # Redis ZRANGE davranışına göre stop inclusive (dahil) olur. -1 sona kadar demek.
+        if stop == -1:
+            return [item[0] for item in sorted_items[start:]]
+        else:
+            return [item[0] for item in sorted_items[start:stop+1]]
