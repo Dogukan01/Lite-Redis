@@ -26,8 +26,7 @@ class RedisHash:
             return 0
 
     def hget(self, field):
-        if field in self.fields:
-            return self.fields.get(field)
+        return self.fields.get(field)
 
     def hdel(self, field):
         if field in self.fields:
@@ -53,8 +52,7 @@ class RedisSortedSet:
         else:
             return 0
     def zscore(self, member):
-        if member in self.members:
-            return self.members.get(member)
+        return self.members.get(member)
 
     def zrem(self, member):
         if member in self.members:
