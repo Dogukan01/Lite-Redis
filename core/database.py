@@ -66,6 +66,14 @@ class RedisDB:
 
         return self.storage[key].zadd(member, score)
 
+    def zrem(self, key, member):
+        if key not in self.storage:
+            return 0
+        elif not isinstance(self.storage[key], RedisSortedSet):
+            raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
+
+        return self.storage[key].zrem(member)
+
     def zrange(self, key, start, stop):
         if key not in self.storage:
             return []
