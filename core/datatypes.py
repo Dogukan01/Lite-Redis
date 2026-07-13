@@ -44,13 +44,19 @@ class RedisSortedSet:
         self.members = {}
 
     def zadd(self, member, score):
+        try:
+            score_float = float(score)
+        except (ValueError, TypeError):
+            raise ValueError("ERR value is not a valid float")
+            
         is_new = member not in self.members
-        self.members[member] = float(score) #float dönüşümü valuerror fırlatabilir!!
+        self.members[member] = score_float
 
         if is_new:
             return 1
         else:
             return 0
+
     def zscore(self, member):
         return self.members.get(member)
 
