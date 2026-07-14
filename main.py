@@ -32,6 +32,16 @@ def get_value(key: str):
     except TypeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/incr/{key}")
+def incr_value(key: str):
+    try:
+        result = db.incr(key)
+        return {"key": key, "value": result}
+    except TypeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+### Hashmap'e ait endpointler
+
 @app.post("/hset")
 def hset_value(request: HSetRequest):
     try:
@@ -56,14 +66,6 @@ def hgetall_value(key:str):
     except TypeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/incr/{key}")
-def incr_value(key: str):
-    try:
-        result = db.incr(key)
-        return {"key": key, "value": result}
-    except TypeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
 @app.delete("/hdel/{key}/{field}")
 def hdel_value(key: str, field: str):
     try:
@@ -72,12 +74,22 @@ def hdel_value(key: str, field: str):
     except TypeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+### Sorted Set'e ait endpointler
+
 @app.post("/zadd")
 def zadd_value(request: ZAddRequest):
     try:
         result = db.zadd(request.key, request.score, request.member)
         return {"status": result}
     except (TypeError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/zscore/{key}/{member}")
+def zscore_value(key: str, member: str):
+    try:
+        result = db.zscore(key, member)
+        return {"key": key, "member": member, "score": result}
+    except TypeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.delete("/zrem/{key}/{member}")
