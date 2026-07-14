@@ -55,9 +55,34 @@ def test_wrong_type_error_handling():
     assert "WRONGTYPE" in response.json()["detail"]
 
 def test_sorted_set():
-
-    response = client.post("/zadd", json={"key":"test_zset_key", "score": 12, "member": "Ali"})
-
+    # 1. Adım: İlk üyeyi ekle
+    response = client.post("/zadd", json={"key": "test_zset_key", "score": 12, "member": "Ali"})
     assert response.status_code == 200
     assert response.json() == {"status": 1}
-    get_response = client.get()
+
+    # 2. Adım: ZSCORE ile skoru doğrula
+    get_response = client.get("/zscore/test_zset_key/Ali")
+    assert get_response.status_code == 200
+    assert get_response.json() == {"key": "test_zset_key", "member": "Ali", "score": 12.0}
+
+    # 3. Adım: Sıralamayı test etmek için farklı skorlara sahip yeni üyeler ekle
+    client.post("/zadd", json={"key": "test_zset_key", "score": 5.5, "member": "Veli"})
+    client.post("/zadd", json={"key": "test_zset_key", "score": 20.0, "member": "Ayse"})
+
+    # 4. Adım: ZRANGE ile sıralı listeyi çek (Küçük skordan büyük skora sıralı olmalı: Veli (5.5) -> Ali (12.0) -> Ayse (20.0))
+    range_response = client.get("/zrange/test_zset_key?start=0&stop=-1")
+    assert range_response.status_code == 200
+    assert range_response.json()["members"] == ["Veli", "Ali", "Ayse"]
+
+    # 5. Adım: ZREM ile bir üyeyi sil
+    rem_response = client.delete("/zrem/test_zset_key/Veli")
+    assert rem_response.status_code == 200
+    assert rem_response.json() == {"status": 1}
+
+    # 6. Adım: Silinen üyenin silindiğini ve listenin güncellendiğini doğrula
+    range_response_after = client.get("/zrange/test_zset_key?start=0&stop=-1")
+    assert range_response_after.json()["members"] == ["Ali", "Ayse"]
+
+    # 7. Adım: Silinen üyenin skorunu sorgula (None dönmeli)
+    score_after = client.get("/zscore/test_zset_key/Veli")
+    assert score_after.json()["score"] is None
