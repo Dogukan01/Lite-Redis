@@ -4,7 +4,7 @@ import time
 import random
 
 # Kendi sanal makinenizin dış IP adresini ve portunu yazın
-BASE_URL = "http://35.239.99.207:8000"
+BASE_URL = "http://35.239.99.207/redis"
 
 async def send_single_request(client, task_id):
     """Sunucuya rastgele bir SET ve ardından GET isteği gönderir."""
@@ -34,7 +34,7 @@ async def start_load_test(total_requests):
     start_time = time.time()
     
     # Tek bir asenkron istemci oturumu açıyoruz (performans için önemlidir)
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         # Görev listemizi oluşturuyoruz
         tasks = [send_single_request(client, i) for i in range(total_requests)]
         
@@ -57,4 +57,4 @@ async def start_load_test(total_requests):
 # Testi çalıştırıyoruz
 if __name__ == "__main__":
     # İlk aşamada 200 eşzamanlı istek ile test edelim
-    asyncio.run(start_load_test(500))
+    asyncio.run(start_load_test(1000))
