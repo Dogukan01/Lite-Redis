@@ -16,7 +16,7 @@ class ZAddRequest(BaseModel):
     score: float
     member: str
 
-app = FastAPI()
+app = FastAPI(root_path="/redis")
 db = RedisDB()
 
 @app.post("/set")
