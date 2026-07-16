@@ -4,7 +4,7 @@ import time
 import random
 
 # Kendi sanal makinenizin dış IP adresini ve portunu yazın
-BASE_URL = "http://35.239.99.207/redis"
+BASE_URL = "http://<IP-Adresi>/redis"
 
 async def send_single_request(client, task_id):
     """Sunucuya rastgele bir SET ve ardından GET isteği gönderir."""
