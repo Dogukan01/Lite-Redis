@@ -20,6 +20,46 @@ class ZAddRequest(BaseModel):
     score: float
     member: str
 
+def nightly_backup_job():
+    """Her gece saat 03:00'te tetiklenecek ana cron fonksiyonu"""
+    print(f"[CRON JOB] Gece yedekleme işlemi başladı. Saat: {datetime.now()}")
+    
+    # 1. Adım: O anki tarihi alıp dosya adı üretiyoruz
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    cron_filename = f"redis_lite_{today_str}.rdb"
+    
+    # 2. Adım: Tarihli dosyayı diske yaz
+    db.save_to_disk(filename=cron_filename)
+    
+    # 3. Adım: Aynı zamanda ana dump dosyasını da güncel tut ki load_from_disk doğrudan oradan okuyabilsin
+    db.save_to_disk(filename="redis_lite_dump.rdb")
+    
+    # 4. Adım: 7 günden eski olan dosyaları arkada temizle
+    db.cleanup_old_backups()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # [AÇILIŞ] Konteyner başlarken diskteki veriyi RAM'e geri yükle
+    db.load_from_disk()
+    
+    # Zamanlayıcıyı (Scheduler) kuruyoruz
+    scheduler = BackgroundScheduler()
+    
+    # Cron kuralı: Her gün (day_of_week='*'), saat 03:00'te (hour=3, minute=0) tetikle
+    trigger = CronTrigger(hour=3, minute=0, day_of_week='*')
+    scheduler.add_job(nightly_backup_job, trigger=trigger, id="nightly_backup")
+    
+    # Zamanlayıcıyı arka planda asenkron olarak uykuya yatırıyoruz, saati gelince uyanacak
+    scheduler.start()
+    print("[SİSTEM] Gece 03:00 CronJob zamanlayıcısı başarıyla başlatıldı.")
+    
+    yield
+    
+    # [KAPANIŞ] Sunucu kapatılırken veriler kaybolmasın diye son bir yedek alıyoruz
+    print("[SİSTEM] Sunucu kapatılıyor, kapanış yedeği alınıyor...")
+    db.save_to_disk(filename="redis_lite_dump.rdb")
+    scheduler.shutdown()
+
 app = FastAPI(root_path="/redis", lifespan=lifespan)
 db = RedisDB()
 
@@ -111,46 +151,6 @@ def zrange_value(key: str, start: int = 0, stop: int = -1):
         return {"key": key, "members": result}
     except TypeError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-def nightly_backup_job():
-    """Her gece saat 03:00'te tetiklenecek ana cron fonksiyonu"""
-    print(f"[CRON JOB] Gece yedekleme işlemi başladı. Saat: {datetime.now()}")
-    
-    # 1. Adım: O anki tarihi alıp dosya adı üretiyoruz
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    cron_filename = f"redis_lite_{today_str}.rdb"
-    
-    # 2. Adım: Tarihli dosyayı diske yaz
-    db.save_to_disk(filename=cron_filename)
-    
-    # 3. Adım: Aynı zamanda ana dump dosyasını da güncel tut ki load_from_disk doğrudan oradan okuyabilsin
-    db.save_to_disk(filename="redis_lite_dump.rdb")
-    
-    # 4. Adım: 7 günden eski olan dosyaları arkada temizle
-    db.cleanup_old_backups()
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # [AÇILIŞ] Konteyner başlarken diskteki veriyi RAM'e geri yükle
-    db.load_from_disk()
-    
-    # Zamanlayıcıyı (Scheduler) kuruyoruz
-    scheduler = BackgroundScheduler()
-    
-    # Cron kuralı: Her gün (day_of_week='*'), saat 03:00'te (hour=3, minute=0) tetikle
-    trigger = CronTrigger(hour=3, minute=0, day_of_week='*')
-    scheduler.add_job(nightly_backup_job, trigger=trigger, id="nightly_backup")
-    
-    # Zamanlayıcıyı arka planda asenkron olarak uykuya yatırıyoruz, saati gelince uyanacak
-    scheduler.start()
-    print("[SİSTEM] Gece 03:00 CronJob zamanlayıcısı başarıyla başlatıldı.")
-    
-    yield
-    
-    # [KAPANIŞ] Sunucu kapatılırken veriler kaybolmasın diye son bir yedek alıyoruz
-    print("[SİSTEM] Sunucu kapatılıyor, kapanış yedeği alınıyor...")
-    db.save_to_disk(filename="redis_lite_dump.rdb")
-    scheduler.shutdown()
 
 @app.post("/admin/backup")
 async def trigger_manual_backup(background_tasks: BackgroundTasks):
