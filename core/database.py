@@ -1,4 +1,4 @@
-from core.datatypes import RedisString, RedisHash, RedisSortedSet
+from core.datatypes import RedisString, RedisHash, RedisSortedSet, RedisList
 import pickle
 import os
 import glob
@@ -170,3 +170,19 @@ class RedisDB:
                     print(f"[TEMİZLİK] 7 günden eski yedek dosyası silindi: {file_path}")
         except Exception as e:
             print(f"[HATA] Eski yedekleri temizleme işlemi başarısız: {e}")
+
+    def set_history(self, vid: str, query: str):
+        if vid not in self.storage:
+            self.storage[vid] = RedisList()
+        elif not isinstance(self.storage[vid], RedisList):
+            raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
+
+        return self.storage[vid].lpush(query)
+
+    def get_history(self, vid: str):
+        if vid not in self.storage:
+            return []
+        if isinstance(self.storage[vid], RedisList):
+            return self.storage[vid].lrange()
+        else:
+            raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")

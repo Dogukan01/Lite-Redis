@@ -11,6 +11,16 @@ class RedisString:
         self.value += 1
         return self.value
 
+class RedisList:
+    def __init__(self, initial_value=None):
+        self.value = initial_value if initial_value is not None else []
+
+    def lpush(self, item):
+        self.value.insert(0, item)
+        return len(self.value)
+
+    def lrange(self):
+        return self.value.copy()
 
 
 class RedisHash:

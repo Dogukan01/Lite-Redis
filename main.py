@@ -152,6 +152,26 @@ def zrange_value(key: str, start: int = 0, stop: int = -1):
     except TypeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+### Search History'e ait Endpointler
+
+@app.post("/set_history")
+def set_history_value(vid: str, query: str):
+    try:
+        result = db.set_history(vid, query)
+        return {"status": "OK", "new_lenght": result}
+    except TypeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/get_history")
+def get_history_value(vid: str):
+    try:
+        result = db.get_history(vid)
+        return result
+    except TypeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+### Manuel Yedek Alma Endpointi
+
 @app.post("/admin/backup")
 async def trigger_manual_backup(background_tasks: BackgroundTasks):
     """
