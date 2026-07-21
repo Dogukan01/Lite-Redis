@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from main import app
+import time
 
 
 client = TestClient(app)
@@ -86,3 +87,20 @@ def test_sorted_set():
     # 7. Adım: Silinen üyenin skorunu sorgula (None dönmeli)
     score_after = client.get("/zscore/test_zset_key/Veli")
     assert score_after.json()["score"] is None
+
+def test_cache_expiration():
+    # 1. Önce normal bir veri ekleyelim
+    response = client.post("/set", json={"key": "oturum", "value": "dogukan123"})
+    assert response.status_code == 200
+    # 2. Bu veriye sadece 2 saniyelik bir ömür biçelim
+    expire_res = client.post("/expire/oturum?seconds=2")
+    assert expire_res.status_code == 200
+    assert expire_res.json()["status"] == "OK"
+    # 3. Süre bitmeden hemen okumaya çalışalım, verinin orada olması lazım
+    get_res_before = client.get("/get/oturum")
+    assert get_res_before.json()["value"] == "dogukan123"
+    # 4. Kodumuzu 3 saniye (TTL'den daha uzun) uyutalım
+    time.sleep(3)
+    # 5. Tekrar okumaya çalışalım. Veri buharlaşmış (null) olmalı!
+    get_res_after = client.get("/get/oturum")
+    assert get_res_after.json()["value"] is None
