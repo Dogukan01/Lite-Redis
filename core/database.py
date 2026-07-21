@@ -322,7 +322,7 @@ class RedisDB:
             print(f"[AOF HATA] Replay hatası: {e}")
         finally:
             self.is_replaying = False
-            
+
         print("[BAŞLANGIÇ] AOF geri yükleme tamamlandı.")
 
     def cleanup_old_backups(self):

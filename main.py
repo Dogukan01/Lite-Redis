@@ -167,6 +167,13 @@ def get_history_value(vid: str):
     except TypeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/expire/{key}")
+def expire_value(key: str, seconds: int):
+    result = db.expire(key, seconds)
+    if result == 1:
+        return {"status": "OK", "message": f"{key} anahtarına {seconds} saniye TTL ayarlandı."}
+    else:
+        raise HTTPException(status_code= 404, detail="Anahtar bulunamadı.")
 ### Manuel Yedek Alma Endpointi
 
 @app.post("/admin/backup")
