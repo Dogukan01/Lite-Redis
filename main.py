@@ -9,6 +9,7 @@ from apscheduler.triggers.cron import CronTrigger
 class SetRequest(BaseModel):
     key: str
     value: str
+    ex: int | None = None
 
 class HSetRequest(BaseModel):
     key: str
@@ -70,10 +71,13 @@ def expire_value(key: str, seconds: int):
     else:
         raise HTTPException(status_code= 404, detail="Anahtar bulunamadı.")
 
+### Set, Get ve Incr Endpointleri
 
 @app.post("/set")
 def set_value(request: SetRequest):
     result = db.set(request.key, request.value)
+    if request.ex is not None:
+        db.expire(request.key, request.ex)
     return {"status": result}
 
 @app.get("/get/{key}")

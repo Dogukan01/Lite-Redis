@@ -90,7 +90,7 @@ def test_sorted_set():
 
 def test_cache_expiration():
     # 1. Önce normal bir veri ekleyelim
-    response = client.post("/set", json={"key": "oturum", "value": "dogukan123"})
+    response = client.post("/set", json={"key": "oturum", "value": "dogukan123", "ex": 3600})
     assert response.status_code == 200
     # 2. Bu veriye sadece 2 saniyelik bir ömür biçelim
     expire_res = client.post("/expire/oturum?seconds=2")
