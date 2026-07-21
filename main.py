@@ -28,13 +28,10 @@ def nightly_backup_job():
     today_str = datetime.now().strftime("%Y-%m-%d")
     cron_filename = f"redis_lite_{today_str}.rdb"
     
-    # 2. Adım: Tarihli dosyayı diske yaz
-    db.save_to_disk(filename=cron_filename)
+    # 2. Adım: BGSAVE ile arka planda yedekle ve AOF'yi döndür
+    db.bgsave(filename=cron_filename)
     
-    # 3. Adım: Aynı zamanda ana dump dosyasını da güncel tut ki load_from_disk doğrudan oradan okuyabilsin
-    db.save_to_disk(filename="redis_lite_dump.rdb")
-    
-    # 4. Adım: 7 günden eski olan dosyaları arkada temizle
+    # 3. Adım: 7 günden eski olan dosyaları arkada temizle
     db.cleanup_old_backups()
 
 @asynccontextmanager
@@ -173,21 +170,20 @@ def get_history_value(vid: str):
 ### Manuel Yedek Alma Endpointi
 
 @app.post("/admin/backup")
-async def trigger_manual_backup(background_tasks: BackgroundTasks):
+async def trigger_manual_backup():
     """
     Swagger UI üzerinden veya kod içinden manuel tetikleyebileceğin yedekleme endpoint'i.
-    API'yi kilitlememesi için işlemi arka plan görevi olarak çalıştırır.
+    API'yi kilitlememesi için işlemi arka plan görevi olarak çalıştırır (BGSAVE).
     """
-    # Manuel yedek ismini saat ve dakika içererek üretiyoruz (Örn: redis_lite_manual_2026-07-17_18-45.rdb)
+    # Manuel yedek ismini saat ve dakika içererek üretiyoruz
     now_str = datetime.now().strftime("%Y-%m-%d_%H-%M")
     manual_filename = f"redis_lite_manual_{now_str}.rdb"
     
-    # API yanıtının hızlı dönmesi, diske yazma işleminin arkada sessizce akması için arka plana atıyoruz
-    background_tasks.add_task(db.save_to_disk, manual_filename)
-    background_tasks.add_task(db.save_to_disk, "redis_lite_dump.rdb") # Ana dump dosyasını da tazele
+    # BGSAVE kendi thread'ini başlattığı için BackgroundTasks kullanmaya gerek yok
+    db.bgsave(filename=manual_filename)
     
     return {
-        "durum": "Yedekleme işlemi arka planda başlatıldı",
+        "durum": "Yedekleme işlemi arka planda (BGSAVE) başlatıldı",
         "olusturulan_dosya": manual_filename,
-        "mesaj": "Verileriniz güvenle diske kaydediliyor."
+        "mesaj": "Verileriniz RDB'ye aktarılıyor ve AOF dosyası yenileniyor."
     }
