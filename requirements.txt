@@ -4,3 +4,5 @@ uvicorn==0.51.0
 httpx==0.28.1
 pytest==9.1.1
 apscheduler==3.11.3
+uvloop==0.20.0
+httptools==0.6.1
