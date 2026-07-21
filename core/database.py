@@ -1,3 +1,4 @@
+import threading
 from core.datatypes import RedisString, RedisHash, RedisSortedSet, RedisList
 from datetime import datetime, timedelta
 import pickle
@@ -28,7 +29,16 @@ class RedisDB:
                 except Exception:
                         pass
 
-        threading.Thread(target=_background_fsync_, daemon=True).start()        
+        def _garbage_collector_():
+            while True:
+                time.sleep(5)
+                now = time.time()
+                for k in list(self.expires.keys()):
+                    if k in self.expires and now > self.expires[k]:
+                        self._check_expire(k)
+
+        threading.Thread(target=_background_fsync_, daemon=True).start()   
+        threading.Thread(target= _garbage_collector_, daemon=True).start()     
 
     def expire(self, key, seconds):
         if key in self.storage:
@@ -37,6 +47,14 @@ class RedisDB:
             return 1
         else:
             return 0
+
+    def _check_expire(self, key):
+        if key in self.expires:
+            if time.time() > self.expires[key]:
+                del self.storage[key]
+                del self.expires[key]
+                return True
+        return False
 
     def _log_to_aof(self, command, *args):
         if self.is_replaying:
@@ -49,11 +67,13 @@ class RedisDB:
             print(f"[AOF HATA] AOF yazılamadı: {e}")
 
     def set(self, key, value):
+        self.expires.pop(key, None)
         self.storage[key] = RedisString(value)
         self._log_to_aof("SET", key, value)
         return "OK"
 
     def get(self, key):
+        self._check_expire(key)
         if key in self.storage:
             if isinstance(self.storage[key], RedisString):
                 return self.storage[key].value
@@ -63,6 +83,7 @@ class RedisDB:
             return None
 
     def incr(self, key):
+        self._check_expire(key)
         if key not in self.storage:
             self.set(key,0)
 
@@ -74,6 +95,7 @@ class RedisDB:
             raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
             
     def hset(self, key, field, value):
+        self.expires.pop(key, None)
         if key not in self.storage:
             self.storage[key] = RedisHash()
         elif not isinstance(self.storage[key], RedisHash):
@@ -84,6 +106,7 @@ class RedisDB:
         return result
 
     def hgetall(self, key):
+        self._check_expire(key)
         if key not in self.storage:
             return {}
         if isinstance(self.storage[key], RedisHash):
@@ -92,6 +115,7 @@ class RedisDB:
             raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
 
     def hget(self, key, field):
+        self._check_expire(key)
         if key not in self.storage:
             return None
         elif not isinstance(self.storage[key], RedisHash):
@@ -100,6 +124,7 @@ class RedisDB:
         return self.storage[key].hget(field)
         
     def hdel(self, key, field):
+        self._check_expire(key)
         if key not in self.storage:
             return 0
         elif not isinstance(self.storage[key], RedisHash):
@@ -111,6 +136,7 @@ class RedisDB:
         return result
 
     def zadd(self, key, score, member):
+        self.expires.pop(key, None)
         if key not in self.storage:
             self.storage[key] = RedisSortedSet()
         elif not isinstance(self.storage[key], RedisSortedSet):
@@ -121,6 +147,7 @@ class RedisDB:
         return result
 
     def zscore(self, key, member):
+        self._check_expire(key)
         if key not in self.storage:
             return None
         elif not isinstance(self.storage[key], RedisSortedSet):
@@ -129,6 +156,7 @@ class RedisDB:
         return self.storage[key].zscore(member)
 
     def zrem(self, key, member):
+        self._check_expire(key)
         if key not in self.storage:
             return 0
         elif not isinstance(self.storage[key], RedisSortedSet):
@@ -140,6 +168,7 @@ class RedisDB:
         return result
 
     def zrange(self, key, start, stop):
+        self._check_expire(key)
         if key not in self.storage:
             return []
         elif not isinstance(self.storage[key], RedisSortedSet):
@@ -159,7 +188,11 @@ class RedisDB:
             temp_path = f"{target_path}.tmp"
             
             with open(temp_path, "wb") as f:
-                pickle.dump(self.storage, f)
+                dump_data={
+                    "storage": self.storage,
+                    "expires": self.expires
+                }
+                pickle.dump(dump_data, f)
             
             os.replace(temp_path, target_path)
             print(f"[YEDEK] Veritabanı başarıyla kaydedildi: {target_path}")
@@ -173,7 +206,10 @@ class RedisDB:
         print("[BGSAVE] Arka plan yedekleme (BGSAVE) başlatılıyor...")
         
         # 1. Snapshot for thread
-        storage_snapshot = dict(self.storage)
+        snapshot_data = {
+            "storage": dict(self.storage),
+            "expires": dict(self.expires)
+        }
         
         # 2. AOF Rotation
         if hasattr(self, 'aof_file') and not self.aof_file.closed:
@@ -212,7 +248,7 @@ class RedisDB:
                 print(f"[BGSAVE HATA] İşlem başarısız: {e}")
 
         # Başlat
-        t = threading.Thread(target=save_task, args=(storage_snapshot, old_aof_path))
+        t = threading.Thread(target=save_task, args=(snapshot_data, old_aof_path))
         t.start()
         return "BGSAVE started in background"
 
@@ -232,7 +268,13 @@ class RedisDB:
         if load_path:
             try:
                 with open(load_path, "rb") as f:
-                    self.storage = pickle.load(f)
+                    loaded_data = pickle.load(f)
+                    if isinstance(loaded_data, dict) and "storage" in loaded_data and "expires" in loaded_data:
+                        self.storage = loaded_data["storage"]
+                        self.expires = loaded_data["expires"]
+                    else:
+                        self.storage = loaded_data
+                        self.expires = {}
                 print(f"[BAŞLANGIÇ] RDB başarıyla yüklendi: {load_path}")
             except Exception as e:
                 print(f"[HATA] RDB okunurken hata oluştu: {e}")
@@ -309,6 +351,7 @@ class RedisDB:
             print(f"[HATA] Eski yedekleri temizleme işlemi başarısız: {e}")
 
     def set_history(self, vid: str, query: str):
+        self.expires.pop(vid, None)
         if vid not in self.storage:
             self.storage[vid] = RedisList()
         elif not isinstance(self.storage[vid], RedisList):
@@ -319,6 +362,7 @@ class RedisDB:
         return result
 
     def get_history(self, vid: str):
+        self._check_expire(vid)
         if vid not in self.storage:
             return []
         if isinstance(self.storage[vid], RedisList):
