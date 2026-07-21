@@ -1,6 +1,8 @@
 from core.database import RedisDB
+from core.tcp_server import start_tcp_server
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -40,6 +42,10 @@ async def lifespan(app: FastAPI):
     # [AÇILIŞ] Konteyner başlarken diskteki veriyi RAM'e geri yükle
     db.load_from_disk()
     
+    # TCP Sunucusunu arka planda başlatıyoruz
+    loop = asyncio.get_event_loop()
+    tcp_task = loop.create_task(start_tcp_server(db))
+    
     # Zamanlayıcıyı (Scheduler) kuruyoruz
     scheduler = BackgroundScheduler()
     
@@ -53,6 +59,13 @@ async def lifespan(app: FastAPI):
     
     yield
     
+    # TCP sunucusunu kapatıyoruz
+    tcp_task.cancel()
+    try:
+        await tcp_task
+    except asyncio.CancelledError:
+        pass
+
     # [KAPANIŞ] Sunucu kapatılırken veriler kaybolmasın diye son bir yedek alıyoruz
     print("[SİSTEM] Sunucu kapatılıyor, kapanış yedeği alınıyor...")
     db.save_to_disk(filename="redis_lite_dump.rdb")
