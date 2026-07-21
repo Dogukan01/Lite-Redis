@@ -75,8 +75,10 @@ def expire_value(key: str, seconds: int):
 
 @app.post("/set")
 def set_value(request: SetRequest):
+    if request.ex is not None and request.ex <= 0:
+        raise HTTPException(status_code=400, detail="ERR invalid expire time in set")
     result = db.set(request.key, request.value)
-    if request.ex is not None:
+    if request.ex is not None and request.ex > 0:
         db.expire(request.key, request.ex)
     return {"status": result}
 
