@@ -1,9 +1,10 @@
 from core.datatypes import RedisString, RedisHash, RedisSortedSet, RedisList
+from datetime import datetime, timedelta
 import pickle
 import os
 import glob
 import threading
-from datetime import datetime, timedelta
+import time
 
 DB_DIR = "/data/"
 DEFAULT_FILE_PATH = os.path.join(DB_DIR, "redis_lite_dump.rdb")
@@ -16,13 +17,25 @@ class RedisDB:
         self.aof_file = open(self.aof_path, "a")
         self.is_replaying = False
 
+        def _background_fsync_():
+            while True:
+                time.sleep(1)
+                try:
+                    if hasattr(self, 'aof_file') and not self.aof_file.closed:
+                        self.aof_file.flush()
+                        os.fsync(self.aof_file.fileno())
+                except Exception:
+                        pass
+
+        threading.Thread(target=_background_fsync_, daemon=True).start()        
+
     def _log_to_aof(self, command, *args):
         if self.is_replaying:
             return
         try:
             line = f"{command} " + " ".join(str(arg) for arg in args) + "\n"
             self.aof_file.write(line)
-            self.aof_file.flush()
+            
         except Exception as e:
             print(f"[AOF HATA] AOF yazılamadı: {e}")
 
