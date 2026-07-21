@@ -12,6 +12,7 @@ DEFAULT_FILE_PATH = os.path.join(DB_DIR, "redis_lite_dump.rdb")
 class RedisDB:
     def __init__(self):
         self.storage = {}
+        self.expires = {}
         os.makedirs(DB_DIR, exist_ok=True)
         self.aof_path = os.path.join(DB_DIR, "appendonly.aof")
         self.aof_file = open(self.aof_path, "a")
@@ -28,6 +29,14 @@ class RedisDB:
                         pass
 
         threading.Thread(target=_background_fsync_, daemon=True).start()        
+
+    def expire(self, key, seconds):
+        if key in self.storage:
+            self.expires[key] = time.time() + int(seconds)
+            self._log_to_aof("EXPIRE", key, seconds)
+            return 1
+        else:
+            return 0
 
     def _log_to_aof(self, command, *args):
         if self.is_replaying:
@@ -247,6 +256,8 @@ class RedisDB:
                     cmd = parts[0].upper()
                     if cmd == "SET" and len(parts) >= 3:
                         self.set(parts[1], parts[2])
+                    elif cmd == "EXPIRE" and len(parts) >=3:
+                        self.expire(parts[1], parts[2])
                     elif cmd == "INCR" and len(parts) >= 2:
                         self.incr(parts[1])
                     elif cmd == "HSET":
