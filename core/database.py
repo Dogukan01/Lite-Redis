@@ -357,7 +357,13 @@ class RedisDB:
         elif not isinstance(self.storage[vid], RedisList):
             raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
 
+        if query in self.storage[vid].value:
+            self.storage[vid].value.remove(query)
+
         result = self.storage[vid].lpush(query)
+
+        if len(self.storage[vid].value) > 20:
+            self.storage[vid].value.pop()
         self._log_to_aof("SET_HISTORY", vid, query)
         return result
 
