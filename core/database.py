@@ -1,5 +1,5 @@
 import threading
-from core.datatypes import RedisString, RedisHash, RedisSortedSet, RedisList
+from core.datatypes import RedisString, RedisHash, RedisSortedSet, RedisList, RedisMRU
 from datetime import datetime, timedelta
 import pickle
 import os
@@ -353,17 +353,11 @@ class RedisDB:
     def set_history(self, vid: str, query: str):
         self.expires.pop(vid, None)
         if vid not in self.storage:
-            self.storage[vid] = RedisList()
-        elif not isinstance(self.storage[vid], RedisList):
+            self.storage[vid] = RedisMRU()
+        elif not isinstance(self.storage[vid], RedisMRU):
             raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
 
-        if query in self.storage[vid].value:
-            self.storage[vid].value.remove(query)
-
-        result = self.storage[vid].lpush(query)
-
-        if len(self.storage[vid].value) > 20:
-            self.storage[vid].value.pop()
+        result = self.storage[vid].add_query(query)
         self._log_to_aof("SET_HISTORY", vid, query)
         return result
 
@@ -371,7 +365,7 @@ class RedisDB:
         self._check_expire(vid)
         if vid not in self.storage:
             return []
-        if isinstance(self.storage[vid], RedisList):
-            return self.storage[vid].lrange()
+        if isinstance(self.storage[vid], RedisMRU):
+            return self.storage[vid].get_query()
         else:
             raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")

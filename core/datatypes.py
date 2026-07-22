@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 class RedisString:
     def __init__(self, value):
         self.value = value
@@ -22,6 +24,19 @@ class RedisList:
     def lrange(self):
         return self.value.copy()
 
+class RedisMRU:
+    def __init__(self):
+        self.value = OrderedDict()
+    
+    def add_query(self, query):
+        self.value[query] = None
+        self.value.move_to_end(query, last=False)
+        if len(self.value) > 20:
+            self.value.popitem(last=True)
+        return len(self.value)
+
+    def get_query(self):
+        return list(self.value.keys())
 
 class RedisHash:
     def __init__(self):
