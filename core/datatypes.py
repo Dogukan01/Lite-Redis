@@ -13,17 +13,36 @@ class RedisString:
         self.value += 1
         return self.value
 
-class RedisList:
-    def __init__(self, initial_value=None):
-        self.value = initial_value if initial_value is not None else []
+# class RedisList:
+#     def __init__(self, initial_value=None):
+#         self.value = initial_value if initial_value is not None else []
 
-    def lpush(self, item):
-        self.value.insert(0, item)
-        return len(self.value)
+#     def lpush(self, item):
+#         self.value.insert(0, item)
+#         return len(self.value)
 
-    def lrange(self):
-        return self.value.copy()
+#     def lrange(self):
+#         return self.value.copy()
 
+class RedisCompanyHistory:
+    def __init__(self):
+        self.visitors = {}
+
+    def add_query(self, vid, query):
+        if vid not in self.visitors:
+            self.visitors[vid] = RedisMRU()
+
+        return self.visitors[vid].add_query(query)
+
+    def get_queries_by_vid(self, vid):
+        if vid in self.visitors:
+            return self.visitors[vid].get_query()
+        return []
+
+    def get_all(self):
+        return {vid: mru.get_query() for vid, mru in self.visitors.items()}
+
+        
 class RedisMRU:
     def __init__(self):
         self.value = OrderedDict()

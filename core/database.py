@@ -1,5 +1,5 @@
 import threading
-from core.datatypes import RedisString, RedisHash, RedisSortedSet, RedisList, RedisMRU
+from core.datatypes import RedisString, RedisHash, RedisSortedSet, RedisMRU, RedisCompanyHistory
 from datetime import datetime, timedelta
 import pickle
 import os
@@ -350,22 +350,26 @@ class RedisDB:
         except Exception as e:
             print(f"[HATA] Eski yedekleri temizleme işlemi başarısız: {e}")
 
-    def set_history(self, vid: str, query: str):
-        self.expires.pop(vid, None)
-        if vid not in self.storage:
-            self.storage[vid] = RedisMRU()
-        elif not isinstance(self.storage[vid], RedisMRU):
+    def set_history(self, cid: str, vid: str, query: str):
+        self.expires.pop(cid, None)
+        if cid not in self.storage:
+            self.storage[cid] = RedisCompanyHistory()
+        elif not isinstance(self.storage[cid], RedisCompanyHistory):
             raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
 
-        result = self.storage[vid].add_query(query)
-        self._log_to_aof("SET_HISTORY", vid, query)
+        result = self.storage[cid].add_query(vid, query)
+        self._log_to_aof("SET_HISTORY", cid, vid, query)
         return result
 
-    def get_history(self, vid: str):
-        self._check_expire(vid)
-        if vid not in self.storage:
-            return []
-        if isinstance(self.storage[vid], RedisMRU):
-            return self.storage[vid].get_query()
+    def get_history(self, cid: str, vid: str = None):
+        self._check_expire(cid)
+        if cid not in self.storage:
+            return {} if vid is None else []
+
+        if isinstance(self.storage[cid], RedisCompanyHistory):
+            if vid:
+                return self.storage[cid].get_queries_by_vid(vid)
+            else:
+                return self.storage[cid].get_all()
         else:
             raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
