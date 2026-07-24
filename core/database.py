@@ -315,9 +315,9 @@ class RedisDB:
                     elif cmd == "ZREM" and len(parts) >= 3:
                         self.zrem(parts[1], parts[2])
                     elif cmd == "SET_HISTORY":
-                        inner_parts = line.strip().split(" ", 2)
-                        if len(inner_parts) >= 3:
-                            self.set_history(inner_parts[1], inner_parts[2])
+                        inner_parts = line.strip().split(" ", 3)
+                        if len(inner_parts) >= 4:
+                            self.set_history(inner_parts[1], inner_parts[2], inner_parts[3])
         except Exception as e:
             print(f"[AOF HATA] Replay hatası: {e}")
         finally:
