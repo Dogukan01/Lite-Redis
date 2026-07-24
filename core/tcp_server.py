@@ -102,8 +102,11 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         print(f"[TCP] Istemci hatasi: {e}")
     finally:
         print(f"[TCP] Baglanti koptu: {addr}")
-        writer.close()
-        await writer.wait_closed()
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except ConnectionResetError:
+            pass
 
 async def start_tcp_server(db, host='0.0.0.0', port=6379):
     """Saf TCP sunucusunu baslatir."""
