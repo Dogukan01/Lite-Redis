@@ -183,7 +183,7 @@ def zrange_value(key: str, start: int = 0, stop: int = -1):
 ### Search History'e ait Endpointler
 
 @app.post("/set_history")
-def set_history_value(cid: str, vid: str, query: str):
+def set_history_value(vid: str, query: str, cid: Optional[str] = "default"):
     try:
         result = db.set_history(cid, vid, query)
         return {"status": "OK", "new_lenght": result}
@@ -191,7 +191,7 @@ def set_history_value(cid: str, vid: str, query: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/get_history")
-def get_history_value(cid: str, vid: Optional[str] = None):
+def get_history_value(cid: Optional[str] = "default", vid: Optional[str] = None):
     try:
         result = db.get_history(cid, vid)
         return result
